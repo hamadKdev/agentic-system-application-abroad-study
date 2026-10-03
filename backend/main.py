@@ -230,6 +230,10 @@ def get_lead(lead_id: str):
 # STUDENT CHAT
 # =========================
 
+# =========================
+# STUDENT CHAT
+# =========================
+
 @app.post("/chat")
 async def chat(data: ChatRequest):
 
@@ -258,7 +262,7 @@ async def chat(data: ChatRequest):
         message_data
     ).execute()
 
-    # Send to Lead/Manager Agent
+    # Send to Lead Agent
     payload = {
         "phone": data.phone,
         "message": data.message,
@@ -273,20 +277,34 @@ async def chat(data: ChatRequest):
             timeout=60
         )
 
+    # Print n8n response for debugging
+    print("N8N STATUS:", response.status_code)
+    print("N8N RESPONSE:", response.text)
+
     if response.status_code != 200:
         raise HTTPException(
             status_code=500,
-            detail="AI agent error"
+            detail=f"AI agent error: {response.text}"
         )
 
-    ai_response = response.json()
+    # Safely handle n8n response
+    try:
+        ai_response = response.json()
+    except Exception:
+        ai_response = {
+            "message": response.text
+        }
 
-    # Save AI response
+    # Get AI message
     ai_message = ai_response.get(
         "message",
-        "Sorry, I could not process your request."
+        ai_response.get(
+            "output",
+            "Sorry, I could not process your request."
+        )
     )
 
+    # Save AI response
     response_data = {
         "phone": data.phone,
         "message": ai_message,
