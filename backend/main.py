@@ -278,127 +278,49 @@ async def chat(data: ChatRequest):
 
     message_lower = data.message.lower()
 
-    university_keywords = [
-        "university",
-        "universities",
-        "tuition",
-        "fee",
-        "fees",
-        "deadline",
-        "ielts",
-        "minimum marks",
-        "requirements",
-        "requirement",
-        "program",
-        "course",
-        "documents",
-        "document",
-        "bsc",
-        "msc",
-        "bachelor",
-        "master",
-        "admission",
-        "admissions"
-    ]
+document_keywords = [
+    "document",
+    "documents",
+    "passport",
+    "transcript",
+    "check my document",
+    "verify document",
+    "document check",
+    "document verification"
+]
 
-    is_university_question = any(
-        keyword in message_lower
-        for keyword in university_keywords
-    )
+university_keywords = [
+    "university",
+    "universities",
+    "tuition",
+    "fee",
+    "fees",
+    "deadline",
+    "ielts",
+    "minimum marks",
+    "requirements",
+    "requirement",
+    "program",
+    "course",
+    "bsc",
+    "msc",
+    "bachelor",
+    "master",
+    "admission",
+    "admissions"
+]
 
-    if is_university_question:
-        agent_webhook = UNIVERSITY_AGENT_WEBHOOK
-        agent_name = "University Agent"
-    else:
-        agent_webhook = LEAD_AGENT_WEBHOOK
-        agent_name = "Lead Agent"
+if any(keyword in message_lower for keyword in document_keywords):
+    agent_webhook = DOCUMENT_AGENT_WEBHOOK
+    agent_name = "Document Agent"
 
-    # ---------------------------------
-    # 4. Prepare payload
-    # ---------------------------------
+elif any(keyword in message_lower for keyword in university_keywords):
+    agent_webhook = UNIVERSITY_AGENT_WEBHOOK
+    agent_name = "University Agent"
 
-    payload = {
-        "phone": data.phone,
-        "message": data.message,
-        "lead": lead
-    }
-
-    # ---------------------------------
-    # 5. Send to selected n8n Agent
-    # ---------------------------------
-
-    async with httpx.AsyncClient() as client:
-
-        response = await client.post(
-            agent_webhook,
-            json=payload,
-            timeout=60
-        )
-
-    # ---------------------------------
-    # 6. Debug n8n response
-    # ---------------------------------
-
-    print("AGENT:", agent_name)
-    print("N8N STATUS:", response.status_code)
-    print("N8N RESPONSE:", response.text)
-
-    if response.status_code != 200:
-        raise HTTPException(
-            status_code=500,
-            detail=f"{agent_name} error: {response.text}"
-        )
-
-    # ---------------------------------
-    # 7. Safely handle n8n response
-    # ---------------------------------
-
-    try:
-        ai_response = response.json()
-
-    except Exception:
-        ai_response = {
-            "message": response.text
-        }
-
-    # ---------------------------------
-    # 8. Get AI response text
-    # ---------------------------------
-
-    ai_message = ai_response.get("message")
-
-    if not ai_message:
-        ai_message = ai_response.get("output")
-
-    if not ai_message:
-        ai_message = (
-            "Sorry, I could not process your request."
-        )
-
-    # ---------------------------------
-    # 9. Save AI response
-    # ---------------------------------
-
-    response_data = {
-        "phone": data.phone,
-        "message": ai_message,
-        "sender": "ai"
-    }
-
-    if lead:
-        response_data["lead_id"] = lead["id"]
-
-    supabase.table("chat_messages").insert(
-        response_data
-    ).execute()
-
-    # ---------------------------------
-    # 10. Return response to frontend
-    # ---------------------------------
-
-    return {
-        "message": ai_message
-    }
+else:
+    agent_webhook = LEAD_AGENT_WEBHOOK
+    agent_name = "Lead Agent"
 
 
 # =========================
