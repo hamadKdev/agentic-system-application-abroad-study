@@ -230,17 +230,9 @@ def get_lead(lead_id: str):
 # STUDENT CHAT
 # =========================
 
-# =========================
-# STUDENT CHAT
-# =========================
-
-# =========================
-# STUDENT CHAT
-# =========================
 @app.post("/chat")
 async def chat(data: ChatRequest):
 
-    # existing lead lookup code
     lead_result = (
         supabase
         .table("leads")
@@ -251,7 +243,6 @@ async def chat(data: ChatRequest):
 
     lead = lead_result.data[0] if lead_result.data else None
 
-    # existing student message save code
     message_data = {
         "phone": data.phone,
         "message": data.message,
@@ -265,7 +256,6 @@ async def chat(data: ChatRequest):
         message_data
     ).execute()
 
-    # 👇 ROUTING YAHAN SE START HOGA
     message_lower = data.message.lower()
 
     document_keywords = [
@@ -312,9 +302,60 @@ async def chat(data: ChatRequest):
         agent_webhook = LEAD_AGENT_WEBHOOK
         agent_name = "Lead Agent"
 
-    # 👇 Iske baad tumhara existing payload + httpx code
-    # same rehna hai
+    payload = {
+        "phone": data.phone,
+        "message": data.message,
+        "lead": lead
+    }
 
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            agent_webhook,
+            json=payload,
+            timeout=60
+        )
+
+    print("AGENT:", agent_name)
+    print("N8N STATUS:", response.status_code)
+    print("N8N RESPONSE:", response.text)
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=500,
+            detail=f"{agent_name} error: {response.text}"
+        )
+
+    try:
+        ai_response = response.json()
+    except Exception:
+        ai_response = {
+            "message": response.text
+        }
+
+    ai_message = ai_response.get("message")
+
+    if not ai_message:
+        ai_message = ai_response.get("output")
+
+    if not ai_message:
+        ai_message = "Sorry, I could not process your request."
+
+    response_data = {
+        "phone": data.phone,
+        "message": ai_message,
+        "sender": "ai"
+    }
+
+    if lead:
+        response_data["lead_id"] = lead["id"]
+
+    supabase.table("chat_messages").insert(
+        response_data
+    ).execute()
+
+    return {
+        "message": ai_message
+    }
 
 # =========================
 # CHAT HISTORY
