@@ -237,14 +237,10 @@ def get_lead(lead_id: str):
 # =========================
 # STUDENT CHAT
 # =========================
-
 @app.post("/chat")
 async def chat(data: ChatRequest):
 
-    # ---------------------------------
-    # 1. Find lead using phone
-    # ---------------------------------
-
+    # existing lead lookup code
     lead_result = (
         supabase
         .table("leads")
@@ -255,10 +251,7 @@ async def chat(data: ChatRequest):
 
     lead = lead_result.data[0] if lead_result.data else None
 
-    # ---------------------------------
-    # 2. Save student message
-    # ---------------------------------
-
+    # existing student message save code
     message_data = {
         "phone": data.phone,
         "message": data.message,
@@ -272,55 +265,55 @@ async def chat(data: ChatRequest):
         message_data
     ).execute()
 
-    # ---------------------------------
-    # 3. Decide which AI Agent to use
-    # ---------------------------------
-
+    # 👇 ROUTING YAHAN SE START HOGA
     message_lower = data.message.lower()
 
-document_keywords = [
-    "document",
-    "documents",
-    "passport",
-    "transcript",
-    "check my document",
-    "verify document",
-    "document check",
-    "document verification"
-]
+    document_keywords = [
+        "document",
+        "documents",
+        "passport",
+        "transcript",
+        "check my document",
+        "verify document",
+        "document check",
+        "document verification"
+    ]
 
-university_keywords = [
-    "university",
-    "universities",
-    "tuition",
-    "fee",
-    "fees",
-    "deadline",
-    "ielts",
-    "minimum marks",
-    "requirements",
-    "requirement",
-    "program",
-    "course",
-    "bsc",
-    "msc",
-    "bachelor",
-    "master",
-    "admission",
-    "admissions"
-]
+    university_keywords = [
+        "university",
+        "universities",
+        "tuition",
+        "fee",
+        "fees",
+        "deadline",
+        "ielts",
+        "minimum marks",
+        "requirements",
+        "requirement",
+        "program",
+        "course",
+        "bsc",
+        "msc",
+        "bachelor",
+        "master",
+        "admission",
+        "admissions"
+    ]
 
-if any(keyword in message_lower for keyword in document_keywords):
-    agent_webhook = DOCUMENT_AGENT_WEBHOOK
-    agent_name = "Document Agent"
+    if any(keyword in message_lower for keyword in document_keywords):
+        agent_webhook = DOCUMENT_AGENT_WEBHOOK
+        agent_name = "Document Agent"
 
-elif any(keyword in message_lower for keyword in university_keywords):
-    agent_webhook = UNIVERSITY_AGENT_WEBHOOK
-    agent_name = "University Agent"
+    elif any(keyword in message_lower for keyword in university_keywords):
+        agent_webhook = UNIVERSITY_AGENT_WEBHOOK
+        agent_name = "University Agent"
 
-else:
-    agent_webhook = LEAD_AGENT_WEBHOOK
-    agent_name = "Lead Agent"
+    else:
+        agent_webhook = LEAD_AGENT_WEBHOOK
+        agent_name = "Lead Agent"
+
+    # 👇 Iske baad tumhara existing payload + httpx code
+    # same rehna hai
 
 
 # =========================
