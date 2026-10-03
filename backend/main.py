@@ -234,10 +234,17 @@ def get_lead(lead_id: str):
 # STUDENT CHAT
 # =========================
 
+# =========================
+# STUDENT CHAT
+# =========================
+
 @app.post("/chat")
 async def chat(data: ChatRequest):
 
-    # Find lead using phone
+    # ---------------------------------
+    # 1. Find lead using phone
+    # ---------------------------------
+
     lead_result = (
         supabase
         .table("leads")
@@ -248,7 +255,10 @@ async def chat(data: ChatRequest):
 
     lead = lead_result.data[0] if lead_result.data else None
 
-    # Save student message
+    # ---------------------------------
+    # 2. Save student message
+    # ---------------------------------
+
     message_data = {
         "phone": data.phone,
         "message": data.message,
@@ -262,49 +272,113 @@ async def chat(data: ChatRequest):
         message_data
     ).execute()
 
-    # Send to Lead Agent
+    # ---------------------------------
+    # 3. Decide which AI Agent to use
+    # ---------------------------------
+
+    message_lower = data.message.lower()
+
+    university_keywords = [
+        "university",
+        "universities",
+        "tuition",
+        "fee",
+        "fees",
+        "deadline",
+        "ielts",
+        "minimum marks",
+        "requirements",
+        "requirement",
+        "program",
+        "course",
+        "documents",
+        "document",
+        "bsc",
+        "msc",
+        "bachelor",
+        "master",
+        "admission",
+        "admissions"
+    ]
+
+    is_university_question = any(
+        keyword in message_lower
+        for keyword in university_keywords
+    )
+
+    if is_university_question:
+        agent_webhook = UNIVERSITY_AGENT_WEBHOOK
+        agent_name = "University Agent"
+    else:
+        agent_webhook = LEAD_AGENT_WEBHOOK
+        agent_name = "Lead Agent"
+
+    # ---------------------------------
+    # 4. Prepare payload
+    # ---------------------------------
+
     payload = {
         "phone": data.phone,
         "message": data.message,
         "lead": lead
     }
 
+    # ---------------------------------
+    # 5. Send to selected n8n Agent
+    # ---------------------------------
+
     async with httpx.AsyncClient() as client:
 
         response = await client.post(
-            LEAD_AGENT_WEBHOOK,
+            agent_webhook,
             json=payload,
             timeout=60
         )
 
-    # Print n8n response for debugging
+    # ---------------------------------
+    # 6. Debug n8n response
+    # ---------------------------------
+
+    print("AGENT:", agent_name)
     print("N8N STATUS:", response.status_code)
     print("N8N RESPONSE:", response.text)
 
     if response.status_code != 200:
         raise HTTPException(
             status_code=500,
-            detail=f"AI agent error: {response.text}"
+            detail=f"{agent_name} error: {response.text}"
         )
 
-    # Safely handle n8n response
+    # ---------------------------------
+    # 7. Safely handle n8n response
+    # ---------------------------------
+
     try:
         ai_response = response.json()
+
     except Exception:
         ai_response = {
             "message": response.text
         }
 
-    # Get AI message
-    ai_message = ai_response.get(
-        "message",
-        ai_response.get(
-            "output",
+    # ---------------------------------
+    # 8. Get AI response text
+    # ---------------------------------
+
+    ai_message = ai_response.get("message")
+
+    if not ai_message:
+        ai_message = ai_response.get("output")
+
+    if not ai_message:
+        ai_message = (
             "Sorry, I could not process your request."
         )
-    )
 
-    # Save AI response
+    # ---------------------------------
+    # 9. Save AI response
+    # ---------------------------------
+
     response_data = {
         "phone": data.phone,
         "message": ai_message,
@@ -317,6 +391,10 @@ async def chat(data: ChatRequest):
     supabase.table("chat_messages").insert(
         response_data
     ).execute()
+
+    # ---------------------------------
+    # 10. Return response to frontend
+    # ---------------------------------
 
     return {
         "message": ai_message
